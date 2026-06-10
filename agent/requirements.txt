@@ -1,0 +1,7 @@
+livekit-agents>=1.5
+livekit-plugins-inworld
+livekit-plugins-silero
+livekit-plugins-openai
+livekit-plugins-turn-detector
+aiohttp
+python-dotenv
