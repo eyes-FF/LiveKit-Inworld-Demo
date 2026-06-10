@@ -226,15 +226,18 @@ function SettingsSidebar({
           disabled={locked}
           className="flex-1 overflow-y-auto disabled:opacity-50"
         >
-          <Section title="语音">
-            <Row label="音色">
-              <input
+          <Section title="音色">
+            <div className="flex flex-col gap-1.5 py-1">
+              <textarea
                 value={value.voice}
                 onChange={(e) => set("voice", e.target.value)}
-                placeholder="Ashley(默认)"
-                className="w-32 rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-right text-xs text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
+                rows={4}
+                placeholder={
+                  "留空用默认 Ashley。\n填音色名/voice ID 直接使用;\n或用英文描述声音属性(年龄/性别/口音/语气),开始通话时自动生成专属音色(约需 15s)。"
+                }
+                className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
               />
-            </Row>
+            </div>
             <Row label="语速" detail={`${value.rate.toFixed(2)}×`}>
               <input
                 type="range"

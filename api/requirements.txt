@@ -4,3 +4,4 @@ livekit-api
 python-dotenv
 fastembed
 numpy
+aiohttp
