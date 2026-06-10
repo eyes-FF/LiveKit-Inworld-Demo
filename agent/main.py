@@ -17,11 +17,16 @@ from livekit.agents import (
     JobContext, JobProcess, WorkerOptions, cli,
 )
 from livekit.plugins import inworld, openai, silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# 轮次检测:默认用神经网络模型(效果好,但推理子进程吃 ~400MB 内存);
+# 小内存环境(如 Railway Trial 1GB)设 TURN_DETECTION=vad 用静音判停,免推理进程
+TURN_DETECTION_MODE = os.getenv("TURN_DETECTION", "model")
+if TURN_DETECTION_MODE != "vad":
+    from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 
 def prewarm(proc: JobProcess):
@@ -182,7 +187,7 @@ async def entrypoint(ctx: JobContext):
         llm=openai.LLM(model="gpt-4.1"),
         tts=inworld.TTS(**tts_kwargs),
         vad=ctx.proc.userdata["vad"],
-        turn_detection=MultilingualModel(),
+        turn_detection="vad" if TURN_DETECTION_MODE == "vad" else MultilingualModel(),
         allow_interruptions=True,  # 保持 True,False 有已知 bug(HANDOFF 坑 5)
         min_interruption_duration=0.5,
         min_interruption_words=2,
