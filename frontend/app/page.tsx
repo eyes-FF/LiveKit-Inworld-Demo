@@ -468,6 +468,24 @@ function Subtitles() {
     if (tm && !tm.finalized) tm.finalized = true;
   }
 
+  // 响应延迟:用户最后一条说完 → AI 第一段开口的间隔(ms)。
+  // 只标在每轮回答的第一段上,分段回复的后续段不重复计算。
+  const latencyById = new Map<string, number>();
+  let pendingUserEnd: number | null = null;
+  for (const t of transcriptions) {
+    const isUser =
+      micSid != null &&
+      t.streamInfo.attributes?.["lk.transcribed_track_id"] === micSid;
+    const tm = timingsRef.current.get(t.streamInfo.id);
+    if (!tm) continue;
+    if (isUser) {
+      pendingUserEnd = tm.lastChange;
+    } else if (pendingUserEnd != null) {
+      latencyById.set(t.streamInfo.id, tm.start - pendingUserEnd);
+      pendingUserEnd = null;
+    }
+  }
+
   return (
     <div
       ref={boxRef}
@@ -482,6 +500,7 @@ function Subtitles() {
           micSid != null &&
           t.streamInfo.attributes?.["lk.transcribed_track_id"] === micSid;
         const tm = timingsRef.current.get(t.streamInfo.id);
+        const latency = latencyById.get(t.streamInfo.id);
         return (
           <div
             key={t.streamInfo.id}
@@ -494,11 +513,25 @@ function Subtitles() {
                   : "bg-neutral-800 text-neutral-200"
               }`}
             >
-              <span className="mb-0.5 block font-mono text-[10px] text-neutral-500">
+              <span className="mb-0.5 flex items-center gap-2 font-mono text-[10px] text-neutral-500">
                 {isUser ? "你" : "AI"}
                 {tm
                   ? ` · ${fmtTime(tm.start)} 至 ${fmtTime(tm.lastChange)}${tm.finalized ? "" : "(进行中)"}`
                   : ""}
+                {latency != null && latency >= 0 ? (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                      latency < 1500
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : latency < 3000
+                          ? "bg-amber-500/15 text-amber-300"
+                          : "bg-red-500/15 text-red-300"
+                    }`}
+                  >
+                    <TimerIcon className="h-3 w-3" />
+                    {Math.round(latency)} ms
+                  </span>
+                ) : null}
               </span>
               {t.text}
             </div>
@@ -573,6 +606,24 @@ function InjectionLog({ events }: { events: InjectionEvent[] }) {
         )}
       </div>
     </div>
+  );
+}
+
+function TimerIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="10" x2="14" y1="2" y2="2" />
+      <line x1="12" x2="15" y1="14" y2="11" />
+      <circle cx="12" cy="14" r="8" />
+    </svg>
   );
 }
 
