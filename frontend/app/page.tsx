@@ -248,6 +248,27 @@ function SettingsSidebar({
           disabled={locked}
           className="flex-1 overflow-y-auto disabled:opacity-50"
         >
+          <Section title="语言">
+            <Row label="对话语言">
+              <select
+                value={value.lang}
+                onChange={(e) => {
+                  // 换语言时重置音色:两种语言的内置音色列表不同
+                  setCustomVoice(false);
+                  onChange({
+                    ...value,
+                    lang: e.target.value as Settings["lang"],
+                    voice: "",
+                  });
+                }}
+                className="w-32 rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 focus:border-neutral-400 focus:outline-none"
+              >
+                <option value="zh-CN">中文</option>
+                <option value="en-US">English</option>
+              </select>
+            </Row>
+          </Section>
+
           <Section title="音色">
             <div className="flex flex-col gap-1.5 py-1">
               <select
@@ -327,24 +348,6 @@ function SettingsSidebar({
           </Section>
 
           <Section title="对话">
-            <Row label="语言">
-              <select
-                value={value.lang}
-                onChange={(e) => {
-                  // 换语言时重置音色:两种语言的内置音色列表不同
-                  setCustomVoice(false);
-                  onChange({
-                    ...value,
-                    lang: e.target.value as Settings["lang"],
-                    voice: "",
-                  });
-                }}
-                className="w-32 rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 focus:border-neutral-400 focus:outline-none"
-              >
-                <option value="zh-CN">中文</option>
-                <option value="en-US">English</option>
-              </select>
-            </Row>
             <Row label="few-shot 注入">
               <input
                 type="checkbox"
