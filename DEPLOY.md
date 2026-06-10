@@ -1,5 +1,13 @@
 # 部署:Vercel(前端) + Railway(API + Agent 单容器)
 
+> **已上线(2026-06-11)**
+> 前端:https://livekit-inworld-demo.vercel.app
+> 后端:https://livekit-inworld-demo-production.up.railway.app(Railway 项目 profound-surprise)
+>
+> 实际部署踩坑(已解决,新部署照抄变量即可):
+> 1. **必须显式设 `PORT=8000`**:Railway 会注入随机 PORT,start.sh 绑了注入值而域名指向 8000 → 502
+> 2. **Trial 1GB 内存跑不动 turn-detector 推理子进程**(OOM 循环崩溃):设 `TURN_DETECTION=vad` 用静音判停;升 Hobby 后可删掉该变量恢复神经网络轮次模型
+
 ## 架构
 
 ```
@@ -27,6 +35,8 @@
    OPENAI_API_KEY=...
    ALLOWED_ORIGINS=https://<你的vercel域名>.vercel.app
    DB_PATH=/data/utterances.db
+   PORT=8000
+   TURN_DETECTION=vad   # 仅小内存(<2GB)环境需要
    ```
 3. 挂 Volume:Service → Volume,Mount Path 填 `/data`(转写持久化)
 4. Settings → Networking → Generate Domain,得到公网 URL(下一步要用)
