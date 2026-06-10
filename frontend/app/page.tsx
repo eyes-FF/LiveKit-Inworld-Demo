@@ -173,6 +173,8 @@ export default function Home() {
   );
 }
 
+type VoiceOption = { id: string; desc: string };
+
 function SettingsSidebar({
   open,
   onToggle,
@@ -190,6 +192,26 @@ function SettingsSidebar({
   inCall: boolean;
   ctxStats: CtxStats | null;
 }) {
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [customVoice, setCustomVoice] = useState(false);
+
+  // 按所选语言拉取 Inworld 内置音色列表
+  useEffect(() => {
+    const lang = value.lang === "zh-CN" ? "zh" : "en";
+    let cancelled = false;
+    fetch(`${BACKEND_URL}/api/voices?lang=${lang}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setVoices(d.voices ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setVoices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value.lang]);
+
   function set<K extends keyof Settings>(key: K, v: Settings[K]) {
     onChange({ ...value, [key]: v });
   }
@@ -228,15 +250,42 @@ function SettingsSidebar({
         >
           <Section title="音色">
             <div className="flex flex-col gap-1.5 py-1">
-              <textarea
-                value={value.voice}
-                onChange={(e) => set("voice", e.target.value)}
-                rows={4}
-                placeholder={
-                  "留空用默认 Ashley。\n填音色名/voice ID 直接使用;\n或用英文描述声音属性(年龄/性别/口音/语气),开始通话时自动生成专属音色(约需 15s)。"
-                }
-                className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
-              />
+              <select
+                value={customVoice ? "__custom__" : value.voice}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setCustomVoice(true);
+                    set("voice", "");
+                  } else {
+                    setCustomVoice(false);
+                    set("voice", e.target.value);
+                  }
+                }}
+                className="w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs text-neutral-100 focus:border-neutral-400 focus:outline-none"
+              >
+                <option value="">
+                  默认({value.lang === "zh-CN" ? "Mei" : "Ashley"})
+                </option>
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.id}
+                    {v.desc ? ` — ${v.desc.slice(0, 40)}` : ""}
+                  </option>
+                ))}
+                <option value="__custom__">自定义(voice ID / 英文描述)…</option>
+              </select>
+              {customVoice ? (
+                <textarea
+                  value={value.voice}
+                  onChange={(e) => set("voice", e.target.value)}
+                  rows={4}
+                  maxLength={10000}
+                  placeholder={
+                    "填 voice ID 直接使用;\n或用英文描述声音属性(年龄/性别/口音/语气),开始通话时自动生成专属音色(约需 15s)。最长 10000 字。"
+                  }
+                  className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
+                />
+              ) : null}
             </div>
             <Row label="语速" detail={`${value.rate.toFixed(2)}×`}>
               <input
@@ -268,8 +317,9 @@ function SettingsSidebar({
                 value={value.persona}
                 onChange={(e) => set("persona", e.target.value)}
                 rows={7}
+                maxLength={10000}
                 placeholder={
-                  "粘贴 persona / system prompt(最长 8000 字),定义 AI 是谁、怎么说话。\n留空用默认助理人设。"
+                  "粘贴 persona / system prompt(最长 10000 字),定义 AI 是谁、怎么说话。\n留空用默认助理人设。"
                 }
                 className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
               />
@@ -280,9 +330,15 @@ function SettingsSidebar({
             <Row label="语言">
               <select
                 value={value.lang}
-                onChange={(e) =>
-                  set("lang", e.target.value as Settings["lang"])
-                }
+                onChange={(e) => {
+                  // 换语言时重置音色:两种语言的内置音色列表不同
+                  setCustomVoice(false);
+                  onChange({
+                    ...value,
+                    lang: e.target.value as Settings["lang"],
+                    voice: "",
+                  });
+                }}
                 className="w-32 rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 focus:border-neutral-400 focus:outline-none"
               >
                 <option value="zh-CN">中文</option>

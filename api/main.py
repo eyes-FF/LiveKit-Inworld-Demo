@@ -106,12 +106,25 @@ class TokenRequest(BaseModel):
     room: str = Field(min_length=1)
     identity: str = Field(min_length=1)
     # 音色:音色名/voice ID 直接用;描述性文字走 Inworld Voice Design 生成专属音色
-    voice: str = Field("", max_length=1000)
-    persona: str = Field("", max_length=8000)  # 人设/instructions,给 LLM
+    voice: str = Field("", max_length=10000)
+    persona: str = Field("", max_length=10000)  # 人设/instructions,给 LLM
     rate: float = Field(1.0, ge=0.5, le=2.0)
     temp: float = Field(1.0, ge=0.0, le=2.0)
     lang: str = Field("zh-CN", pattern="^(zh-CN|en-US)$")
     shots: bool = True
+
+
+# 会话配置存 API 侧(room → settings),agent 入房后按房间名取。
+# 长文本(人设/音色描述)不进 token metadata:中文 JSON 转义后 10K 字 ≈ 60KB,
+# 会顶爆 64KB metadata 上限且 token 走 URL 传输。内存 dict,demo 够用。
+SESSION_CONFIGS: dict[str, dict] = {}
+MAX_SESSION_CONFIGS = 200
+
+
+def store_session_config(room: str, settings: dict):
+    SESSION_CONFIGS[room] = settings
+    while len(SESSION_CONFIGS) > MAX_SESSION_CONFIGS:
+        SESSION_CONFIGS.pop(next(iter(SESSION_CONFIGS)))
 
 
 async def resolve_voice(voice_text: str, lang: str) -> str:
@@ -179,21 +192,23 @@ async def resolve_voice(voice_text: str, lang: str) -> str:
 def _issue_token(req: TokenRequest) -> dict:
     if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
         raise HTTPException(503, "LIVEKIT_API_KEY/SECRET 未配置")
-    # 会话设置写进参与者 metadata,agent 入房后读取并以此构造 STT/TTS/instructions
-    settings = {
-        "voice": req.voice.strip(),
-        "persona": req.persona.strip(),
-        "rate": req.rate,
-        "temp": req.temp,
-        "lang": req.lang,
-        "shots": req.shots,
-    }
+    # 完整设置(含长文本)存 API 侧,agent 按房间名取;token 不带 metadata
+    store_session_config(
+        req.room,
+        {
+            "voice": req.voice.strip(),
+            "persona": req.persona.strip(),
+            "rate": req.rate,
+            "temp": req.temp,
+            "lang": req.lang,
+            "shots": req.shots,
+        },
+    )
     token = (
         lk_api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
         .with_identity(req.identity)
         .with_grants(lk_api.VideoGrants(room_join=True, room=req.room))
         .with_ttl(timedelta(hours=2))
-        .with_metadata(json.dumps(settings))
         .to_jwt()
     )
     return {"token": token, "url": LIVEKIT_URL}
@@ -213,6 +228,51 @@ async def get_token(
 ):
     """简单 GET 入口,供脚本/调试用(默认设置)。"""
     return _issue_token(TokenRequest(room=room, identity=identity))
+
+
+@app.get("/api/session-config")
+async def get_session_config(room: str = Query(..., min_length=1)):
+    """agent 入房后按房间名取会话配置。"""
+    return SESSION_CONFIGS.get(room, {})
+
+
+# ---------- /api/voices ----------
+
+VOICES_CACHE: dict[str, list] = {}
+
+
+@app.get("/api/voices")
+async def list_voices(lang: str = Query("zh", pattern="^(zh|en)$")):
+    """按语言列出 Inworld 内置音色(代理 + 内存缓存),供前端下拉选择。"""
+    if lang in VOICES_CACHE:
+        return {"voices": VOICES_CACHE[lang]}
+    if not INWORLD_API_KEY:
+        return {"voices": []}
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(
+                f"{INWORLD_BASE}/tts/v1/voices",
+                params={"filter": f"language={lang}"},
+                headers={"Authorization": f"Basic {INWORLD_API_KEY}"},
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status != 200:
+                    print(f"[voices] 拉取失败 {resp.status}")
+                    return {"voices": []}
+                data = await resp.json()
+        voices = [
+            {
+                "id": v.get("voiceId"),
+                "desc": (v.get("description") or "")[:80],
+            }
+            for v in data.get("voices", [])
+            if v.get("voiceId")
+        ]
+        VOICES_CACHE[lang] = voices
+        return {"voices": voices}
+    except Exception as e:
+        print(f"[voices] 异常: {e}")
+        return {"voices": []}
 
 
 # ---------- /api/shots & /api/context ----------

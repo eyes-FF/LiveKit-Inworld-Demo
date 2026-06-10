@@ -37,6 +37,9 @@ GREETINGS = {
     "zh-CN": "你好,我是 AI 助理,可以开始说话了。",
     "en-US": "Hi, I'm your AI assistant. You can start talking now.",
 }
+# 未指定音色时按语言选原生默认:Ashley 是英文音色,说中文洋腔洋调;
+# Mei 是 Inworld 中文库里的标准普通话女声(list_voices(language='zh') 确认)
+DEFAULT_VOICE_BY_LANG = {"zh-CN": "Mei", "en-US": "Ashley"}
 
 
 class DemoAgent(Agent):
@@ -124,6 +127,21 @@ class DemoAgent(Agent):
             pass
 
 
+async def fetch_session_config(room: str) -> dict:
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(
+                f"{BACKEND_URL}/api/session-config",
+                params={"room": room},
+                timeout=aiohttp.ClientTimeout(total=3),
+            ) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+    except Exception as e:
+        print(f"[agent] 取会话配置失败,用默认设置: {e}")
+    return {}
+
+
 async def fetch_context(text: str) -> dict:
     try:
         async with aiohttp.ClientSession() as s:
@@ -142,22 +160,18 @@ async def fetch_context(text: str) -> dict:
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    # 等首个参与者入房,从其 metadata 读会话设置(由 /api/token 写入)
-    participant = await ctx.wait_for_participant()
-    cfg: dict = {}
-    if participant.metadata:
-        try:
-            cfg = json.loads(participant.metadata)
-        except ValueError:
-            pass
-    voice = (cfg.get("voice") or "").strip()
-    persona = (cfg.get("persona") or "").strip()
+    # 会话设置存在 API 侧(长文本不走 token metadata),按房间名取
+    cfg = await fetch_session_config(ctx.room.name)
     lang = cfg.get("lang") or "zh-CN"
+    persona = (cfg.get("persona") or "").strip()
     inject_shots = bool(cfg.get("shots", True))
+    voice = (cfg.get("voice") or "").strip() or DEFAULT_VOICE_BY_LANG.get(lang, "")
 
     tts_kwargs: dict = {
         "speaking_rate": float(cfg.get("rate") or 1.0),
         "temperature": float(cfg.get("temp") or 1.0),
+        # 显式告诉 TTS 目标语言,改善多语音色的发音
+        "language": "zh" if lang.startswith("zh") else "en",
     }
     if voice:
         tts_kwargs["voice"] = voice
