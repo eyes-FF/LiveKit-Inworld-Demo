@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from livekit import api as lk_api
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # .env 放在仓库根目录,api/ 是子目录
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -94,35 +94,53 @@ app.add_middleware(
 
 # ---------- /api/token ----------
 
-@app.get("/api/token")
-async def get_token(
-    room: str = Query(..., min_length=1),
-    identity: str = Query(..., min_length=1),
-    voice: str = Query("", max_length=2000),
-    rate: float = Query(1.0, ge=0.5, le=2.0),
-    temp: float = Query(1.0, ge=0.0, le=2.0),
-    lang: str = Query("zh-CN", pattern="^(zh-CN|en-US)$"),
-    shots: bool = Query(True),
-):
+class TokenRequest(BaseModel):
+    room: str = Field(min_length=1)
+    identity: str = Field(min_length=1)
+    voice: str = Field("", max_length=200)  # Inworld 音色名/voice ID,不是人设
+    persona: str = Field("", max_length=8000)  # 人设/instructions,长文本
+    rate: float = Field(1.0, ge=0.5, le=2.0)
+    temp: float = Field(1.0, ge=0.0, le=2.0)
+    lang: str = Field("zh-CN", pattern="^(zh-CN|en-US)$")
+    shots: bool = True
+
+
+def _issue_token(req: TokenRequest) -> dict:
     if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
         raise HTTPException(503, "LIVEKIT_API_KEY/SECRET 未配置")
-    # 会话设置写进参与者 metadata,agent 入房后读取并以此构造 STT/TTS
+    # 会话设置写进参与者 metadata,agent 入房后读取并以此构造 STT/TTS/instructions
     settings = {
-        "voice": voice.strip(),
-        "rate": rate,
-        "temp": temp,
-        "lang": lang,
-        "shots": shots,
+        "voice": req.voice.strip(),
+        "persona": req.persona.strip(),
+        "rate": req.rate,
+        "temp": req.temp,
+        "lang": req.lang,
+        "shots": req.shots,
     }
     token = (
         lk_api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-        .with_identity(identity)
-        .with_grants(lk_api.VideoGrants(room_join=True, room=room))
+        .with_identity(req.identity)
+        .with_grants(lk_api.VideoGrants(room_join=True, room=req.room))
         .with_ttl(timedelta(hours=2))
         .with_metadata(json.dumps(settings))
         .to_jwt()
     )
     return {"token": token, "url": LIVEKIT_URL}
+
+
+@app.post("/api/token")
+async def post_token(req: TokenRequest):
+    """前端用 POST(人设是长文本,不走 URL)。"""
+    return _issue_token(req)
+
+
+@app.get("/api/token")
+async def get_token(
+    room: str = Query(..., min_length=1),
+    identity: str = Query(..., min_length=1),
+):
+    """简单 GET 入口,供脚本/调试用(默认设置)。"""
+    return _issue_token(TokenRequest(room=room, identity=identity))
 
 
 # ---------- /api/shots & /api/context ----------

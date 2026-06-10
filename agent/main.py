@@ -40,9 +40,16 @@ GREETINGS = {
 
 
 class DemoAgent(Agent):
-    def __init__(self, lang: str = "zh-CN", inject_shots: bool = True, room=None):
+    def __init__(
+        self,
+        lang: str = "zh-CN",
+        inject_shots: bool = True,
+        room=None,
+        persona: str = "",
+    ):
+        # 用户自定义人设(persona)优先,否则按语言用默认 instructions
         super().__init__(
-            instructions=INSTRUCTIONS.get(lang, INSTRUCTIONS["zh-CN"]),
+            instructions=persona or INSTRUCTIONS.get(lang, INSTRUCTIONS["zh-CN"]),
         )
         self._inject_shots = inject_shots
         self._room = room
@@ -144,6 +151,7 @@ async def entrypoint(ctx: JobContext):
         except ValueError:
             pass
     voice = (cfg.get("voice") or "").strip()
+    persona = (cfg.get("persona") or "").strip()
     lang = cfg.get("lang") or "zh-CN"
     inject_shots = bool(cfg.get("shots", True))
 
@@ -176,10 +184,18 @@ async def entrypoint(ctx: JobContext):
             )
 
     await session.start(
-        agent=DemoAgent(lang=lang, inject_shots=inject_shots, room=ctx.room),
+        agent=DemoAgent(
+            lang=lang, inject_shots=inject_shots, room=ctx.room, persona=persona
+        ),
         room=ctx.room,
     )
-    await session.say(GREETINGS.get(lang, GREETINGS["zh-CN"]))
+    if persona:
+        # 自定义人设:让 LLM 按人设生成开场白,固定问候语会出戏
+        session.generate_reply(
+            instructions="Greet the user briefly, fully in character."
+        )
+    else:
+        await session.say(GREETINGS.get(lang, GREETINGS["zh-CN"]))
 
 
 async def push_utterance(room: str, role: str, content: str):

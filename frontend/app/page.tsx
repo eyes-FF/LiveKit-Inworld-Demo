@@ -17,6 +17,7 @@ type Conn = { token: string; url: string };
 
 type Settings = {
   voice: string;
+  persona: string;
   rate: number;
   temp: number;
   lang: "zh-CN" | "en-US";
@@ -46,6 +47,7 @@ function fmtTime(t: number): string {
 
 const DEFAULT_SETTINGS: Settings = {
   voice: "",
+  persona: "",
   rate: 1.0,
   temp: 1.0,
   lang: "zh-CN",
@@ -86,16 +88,20 @@ export default function Home() {
     setCtxStats(null);
     setInjections([]);
     try {
-      const params = new URLSearchParams({
-        room: `web-${Date.now()}`,
-        identity: `user-${Math.random().toString(36).slice(2, 8)}`,
-        rate: String(settings.rate),
-        temp: String(settings.temp),
-        lang: settings.lang,
-        shots: String(settings.shots),
+      const resp = await fetch(`${BACKEND_URL}/api/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: `web-${Date.now()}`,
+          identity: `user-${Math.random().toString(36).slice(2, 8)}`,
+          voice: settings.voice.trim(),
+          persona: settings.persona.trim(),
+          rate: settings.rate,
+          temp: settings.temp,
+          lang: settings.lang,
+          shots: settings.shots,
+        }),
       });
-      if (settings.voice.trim()) params.set("voice", settings.voice.trim());
-      const resp = await fetch(`${BACKEND_URL}/api/token?${params}`);
       if (!resp.ok) throw new Error(`token API ${resp.status}`);
       setConn(await resp.json());
     } catch (e) {
@@ -221,18 +227,14 @@ function SettingsSidebar({
           className="flex-1 overflow-y-auto disabled:opacity-50"
         >
           <Section title="语音">
-            <div className="flex flex-col gap-1.5 py-1">
-              <span className="text-xs text-neutral-400">音色</span>
-              <textarea
+            <Row label="音色">
+              <input
                 value={value.voice}
                 onChange={(e) => set("voice", e.target.value)}
-                rows={5}
-                placeholder={
-                  "留空用默认 Ashley。\n可填音色名(如 Hades / Wendy),或粘贴自定义 voice ID / 长段音色描述…"
-                }
-                className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
+                placeholder="Ashley(默认)"
+                className="w-32 rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-right text-xs text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
               />
-            </div>
+            </Row>
             <Row label="语速" detail={`${value.rate.toFixed(2)}×`}>
               <input
                 type="range"
@@ -255,6 +257,20 @@ function SettingsSidebar({
                 className="w-32 accent-neutral-300"
               />
             </Row>
+          </Section>
+
+          <Section title="人设">
+            <div className="flex flex-col gap-1.5 py-1">
+              <textarea
+                value={value.persona}
+                onChange={(e) => set("persona", e.target.value)}
+                rows={7}
+                placeholder={
+                  "粘贴 persona / system prompt(最长 8000 字),定义 AI 是谁、怎么说话。\n留空用默认助理人设。"
+                }
+                className="w-full resize-y rounded border border-neutral-700 bg-neutral-950 px-2.5 py-2 text-xs leading-relaxed text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-400 focus:outline-none"
+              />
+            </div>
           </Section>
 
           <Section title="对话">
