@@ -50,20 +50,19 @@ Demo API (FastAPI)
 
 ---
 
-## 3. 仓库结构建议
+## 3. 仓库结构(2026-06-11 起代码统一在 src/ 下)
 
 ```
 /
-├── frontend/          # Next.js,~200 行
-│   └── app/page.tsx   # 开始通话按钮 + <LiveKitRoom> + 字幕区
-├── agent/
-│   ├── main.py        # Agent Worker 入口
-│   ├── shots.py       # 调 /api/shots 的客户端
-│   └── requirements.txt
-├── api/
-│   ├── main.py        # FastAPI: /token /shots /utterance
-│   └── few_shots.json # few-shot 示例库
+├── src/
+│   ├── frontend/      # Next.js(通话 UI + 设置面板 + 注入观测)
+│   ├── agent/         # Agent Worker(main.py + requirements.txt)
+│   ├── api/           # FastAPI(main.py / retrieval.py / few_shots.json / knowledge.json)
+│   └── scripts/       # 自动化语音探针
+├── Dockerfile         # API+Agent 单容器(容器内仍铺平为 /app/api、/app/agent)
+├── start.sh
 ├── .env.example
+├── README.md / DEPLOY.md / CLAUDE.md / docs/
 └── HANDOFF.md         # 本文档
 ```
 

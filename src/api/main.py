@@ -21,7 +21,7 @@ from livekit import api as lk_api
 from pydantic import BaseModel, Field
 
 # .env 放在仓库根目录,api/ 是子目录
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # 仓库根目录的 .env
 
 LIVEKIT_URL = os.getenv("LIVEKIT_URL", "")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "")

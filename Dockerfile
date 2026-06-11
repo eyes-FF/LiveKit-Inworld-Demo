@@ -7,12 +7,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY api/requirements.txt api/requirements.txt
-COPY agent/requirements.txt agent/requirements.txt
+# 代码统一在 src/ 下;容器内仍铺平为 /app/api、/app/agent(start.sh 依赖此布局)
+COPY src/api/requirements.txt api/requirements.txt
+COPY src/agent/requirements.txt agent/requirements.txt
 RUN pip install --no-cache-dir -r api/requirements.txt -r agent/requirements.txt
 
-COPY api/ api/
-COPY agent/ agent/
+COPY src/api/ api/
+COPY src/agent/ agent/
 COPY start.sh ./
 RUN chmod +x start.sh
 

@@ -18,7 +18,7 @@ from livekit.agents import (
 )
 from livekit.plugins import inworld, openai, silero
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # 仓库根目录的 .env
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 

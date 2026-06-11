@@ -1,10 +1,14 @@
 .venv/
-frontend/
+src/frontend/
+src/scripts/
 node_modules/
 .git/
 .env
 *.db
 __pycache__/
 *.pyc
-scripts/
+docs/
 HANDOFF.md
+DEPLOY.md
+README.md
+CLAUDE.md

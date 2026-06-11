@@ -45,7 +45,7 @@
 
 ## Vercel(前端)
 
-1. Root Directory 设为 `frontend/`
+1. Root Directory 设为 `src/frontend/`(CLI 部署则直接 `cd src/frontend && vercel --prod`)
 2. 环境变量:
    ```
    NEXT_PUBLIC_BACKEND_URL=https://<railway域名>

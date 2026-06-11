@@ -26,8 +26,8 @@ import aiohttp
 from dotenv import load_dotenv
 from livekit import rtc
 
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
+ROOT = Path(__file__).resolve().parents[1]  # src/
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # 仓库根目录的 .env
 
 LIVEKIT_URL = os.environ["LIVEKIT_URL"]
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")

@@ -55,14 +55,16 @@ Demo API (FastAPI)
 ## 目录结构
 
 ```
-api/         FastAPI(token/检索/转写) + few_shots.json + knowledge.json + retrieval.py
-agent/       LiveKit Agent Worker(STT/LLM/TTS pipeline + 注入钩子)
-frontend/    Next.js 前端(通话 UI + 设置面板 + 注入观测)
-scripts/     自动化语音探针(无需浏览器验证全链路)
-Dockerfile   API + Agent 单容器镜像(模型烘进镜像)
-start.sh     容器内双进程启动
-DEPLOY.md    部署手册(Railway + Vercel,含实录踩坑)
-HANDOFF.md   实现指南与全部已知坑
+src/
+├── api/        FastAPI(token/检索/转写) + few_shots.json + knowledge.json + retrieval.py
+├── agent/      LiveKit Agent Worker(STT/LLM/TTS pipeline + 注入钩子)
+├── frontend/   Next.js 前端(通话 UI + 设置面板 + 注入观测)
+└── scripts/    自动化语音探针(无需浏览器验证全链路)
+Dockerfile      API + Agent 单容器镜像(模型烘进镜像)
+start.sh        容器内双进程启动
+DEPLOY.md       部署手册(Railway + Vercel,含实录踩坑)
+HANDOFF.md      实现指南与全部已知坑
+docs/           产品技术方案
 ```
 
 ## 本地开发
@@ -70,19 +72,19 @@ HANDOFF.md   实现指南与全部已知坑
 ```bash
 # 0. 准备 .env(参考 .env.example,需 LiveKit Cloud / Inworld / OpenAI 凭据)
 python3 -m venv .venv
-.venv/bin/pip install -r api/requirements.txt -r agent/requirements.txt
-.venv/bin/python agent/main.py download-files   # 首次:预拉 turn-detector 模型
+.venv/bin/pip install -r src/api/requirements.txt -r src/agent/requirements.txt
+.venv/bin/python src/agent/main.py download-files   # 首次:预拉 turn-detector 模型
 
 # 1. API(端口 8000;macOS 必须带 SSL_CERT_FILE,否则连不上外部服务)
 export SSL_CERT_FILE=$(.venv/bin/python -m certifi)
-cd api && ../.venv/bin/uvicorn main:app --port 8000
+cd src/api && ../../.venv/bin/uvicorn main:app --port 8000
 
 # 2. Agent Worker(另开终端)
 export SSL_CERT_FILE=$(.venv/bin/python -m certifi)
-.venv/bin/python agent/main.py dev
+.venv/bin/python src/agent/main.py dev
 
 # 3. 前端(另开终端)
-cd frontend && npm install && npm run dev
+cd src/frontend && npm install && npm run dev
 ```
 
 ### 自动化验证(无需浏览器)
@@ -91,7 +93,7 @@ cd frontend && npm install && npm run dev
 # 全链路:say 合成中文语音当麦克风 → STT → LLM(含注入) → TTS → 校验转写
 say -v Tingting "今天天气怎么样" -o /tmp/probe_say.aiff
 afconvert -f WAVE -d LEI16@48000 -c 1 /tmp/probe_say.aiff /tmp/probe_say.wav
-SSL_CERT_FILE=$(.venv/bin/python -m certifi) .venv/bin/python -u scripts/talk_probe.py /tmp/probe_say.wav
+SSL_CERT_FILE=$(.venv/bin/python -m certifi) .venv/bin/python -u src/scripts/talk_probe.py /tmp/probe_say.wav
 ```
 
 ## 部署与升级
@@ -99,11 +101,11 @@ SSL_CERT_FILE=$(.venv/bin/python -m certifi) .venv/bin/python -u scripts/talk_pr
 | 动作 | 方式 | 耗时 |
 |---|---|---|
 | 改 agent / api | `git push`(Railway 自动构建部署) | ~10 分钟 |
-| 改 frontend | `cd frontend && vercel --prod`(CLI,不走 GitHub) | ~30 秒 |
+| 改 frontend | `cd src/frontend && vercel --prod`(CLI,不走 GitHub) | ~30 秒 |
 
 完整部署手册与踩坑见 [DEPLOY.md](DEPLOY.md)。
 
 ## 维护知识库
 
-- 加知识:编辑 `api/knowledge.json`(`{id, text}`),重启 API 自动重建向量索引
-- 加风格示例:编辑 `api/few_shots.json`(`{keywords, input, output}`),keywords 是检索加分项
+- 加知识:编辑 `src/api/knowledge.json`(`{id, text}`),重启 API 自动重建向量索引
+- 加风格示例:编辑 `src/api/few_shots.json`(`{keywords, input, output}`),keywords 是检索加分项
